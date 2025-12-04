@@ -65,7 +65,17 @@ router.post('/session', authenticateToken, async (req: AuthRequest, res) => {
           participant2: {
             select: { id: true, name: true, picture: true, email: true },
           },
-          messages: [],
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              sender: {
+                select: { id: true, name: true, picture: true },
+              },
+              receiver: {
+                select: { id: true, name: true, picture: true },
+              },
+            },
+          },
         },
       });
     }
@@ -207,16 +217,16 @@ router.post('/session/:sessionId/read', authenticateToken, async (req: AuthReque
     // Emit read receipts via socket
     const { getSocketInstance } = require('../socketInstance');
     const io = getSocketInstance();
-    if (io) {
+    if (io && io.sockets) {
       // Notify sender that messages were read
       const senderId = session.participant1Id === currentUserId 
         ? session.participant2Id 
         : session.participant1Id;
       
       const senderSocket = Array.from(io.sockets.sockets.values())
-        .find((socket: any) => socket.userId === senderId);
+        .find((socket: any) => socket.userId === senderId) as any;
       
-      if (senderSocket) {
+      if (senderSocket && senderSocket.emit) {
         senderSocket.emit('messages-read', {
           sessionId,
           messageIds: updatedMessages.map(m => m.id),

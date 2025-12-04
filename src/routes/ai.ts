@@ -41,21 +41,20 @@ router.post('/session', authenticateToken, async (req: AuthRequest, res) => {
       // Create AI user with a dummy password (never used for login)
       const hashedPassword = await bcrypt.hash('ai-user-no-login', 10);
       
-      aiUser = await prisma.user.create({
+      await prisma.user.create({
         data: {
           id: AI_USER_ID,
           email: 'ai@assistant.com',
           name: 'AI Assistant',
           password: hashedPassword,
+          emailVerified: false,
           picture: 'https://ui-avatars.com/api/?name=AI&background=6366f1&color=fff',
         },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          picture: true,
-          createdAt: true,
-        },
+      });
+      
+      // Fetch the created user
+      aiUser = await prisma.user.findUnique({
+        where: { id: AI_USER_ID },
       });
     }
 
@@ -102,7 +101,17 @@ router.post('/session', authenticateToken, async (req: AuthRequest, res) => {
           participant2: {
             select: { id: true, name: true, picture: true, email: true },
           },
-          messages: [],
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              sender: {
+                select: { id: true, name: true, picture: true },
+              },
+              receiver: {
+                select: { id: true, name: true, picture: true },
+              },
+            },
+          },
         },
       });
     }
@@ -165,14 +174,14 @@ router.post('/message', authenticateToken, async (req: AuthRequest, res) => {
     });
 
     // Build messages array for OpenAI
-    const messages = conversationHistory.map((msg) => ({
-      role: msg.senderId === AI_USER_ID ? 'assistant' : 'user',
+    const messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = conversationHistory.map((msg) => ({
+      role: (msg.senderId === AI_USER_ID ? 'assistant' : 'user') as 'user' | 'assistant',
       content: msg.content,
     }));
 
     // Add current message
     messages.push({
-      role: 'user',
+      role: 'user' as const,
       content,
     });
 
@@ -233,12 +242,12 @@ router.post('/message', authenticateToken, async (req: AuthRequest, res) => {
 
     // Emit messages via socket
     const io = getSocketInstance();
-    if (io) {
+    if (io && io.sockets) {
       // Find user's socket
       const userSocket = Array.from(io.sockets.sockets.values())
-        .find((socket: any) => socket.userId === currentUserId);
+        .find((socket: any) => socket.userId === currentUserId) as any;
       
-      if (userSocket) {
+      if (userSocket && userSocket.emit) {
         userSocket.emit('new-message', userMessage);
         userSocket.emit('new-message', aiMessage);
       }
