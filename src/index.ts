@@ -3,14 +3,14 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
-import { getAuth } from './auth-wrapper.js';
+import { auth } from './auth';
 import { toNodeHandler } from "better-auth/node";
 import userRoutes from './routes/users.js';
 import chatRoutes from './routes/chat.js';
 import aiRoutes from './routes/ai.js';
 import { initializeSocket } from './socket.js';
 import { setSocketInstance } from './socketInstance.js';
-import { corsMiddleware } from './middleware/cors.js';
+import cors from 'cors';
 
 // Load .env file from backend directory (relative to compiled output)
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -31,40 +31,10 @@ if (apiKey) {
 
 const app = express();
 const httpServer = createServer(app);
-// Socket.IO CORS configuration - supports dynamic origins
-const getSocketCorsOrigin = (origin: string | undefined): boolean | string => {
-  if (!origin) return false;
-  
-  // Allow localhost in development
-  if (origin.startsWith('http://localhost:')) {
-    return origin;
-  }
-  
-  // Allow any Vercel deployment URL
-  if (origin.endsWith('.vercel.app')) {
-    return origin;
-  }
-  
-  // Allow specific frontend URL if set
-  if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
-    return origin;
-  }
-  
-  // Check allowed origins list
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
-    : [];
-  
-  if (allowedOrigins.includes(origin)) {
-    return origin;
-  }
-  
-  return false;
-};
-
+// Socket.IO CORS configuration - simple and permissive like working version
 const io = new Server(httpServer, {
   cors: {
-    origin: getSocketCorsOrigin,
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -72,27 +42,6 @@ const io = new Server(httpServer, {
   transports: ["websocket", "polling"],
   pingTimeout: 60000,
   pingInterval: 25000,
-  path: "/socket.io",
-  allowEIO3: true,
-});
-
-// Log socket connection attempts
-io.engine.on("connection_error", (err) => {
-  console.error("❌ Socket.IO engine connection error:", err);
-  console.error("Error details:", {
-    req: err.req?.url,
-    code: err.code,
-    message: err.message,
-    context: err.context,
-  });
-});
-
-io.engine.on("upgrade", (req, socket, head) => {
-  console.log("🔌 Socket.IO upgrade attempt:", {
-    url: req.url,
-    headers: req.headers,
-    origin: req.headers.origin,
-  });
 });
 
 const PORT = process.env.PORT || 3001;
@@ -101,7 +50,10 @@ const PORT = process.env.PORT || 3001;
 setSocketInstance(io);
 
 // Middleware
-app.use(corsMiddleware); // Use custom CORS middleware for production support
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -148,12 +100,8 @@ app.use("/api/auth/*", (req, res, next) => {
   next();
 });
 
-// Setup Better Auth handler with dynamic import
-app.all("/api/auth/*", async (req, res) => {
-  const auth = await getAuth();
-  const handler = toNodeHandler(auth);
-  return handler(req, res);
-});
+// Setup Better Auth handler
+app.all("/api/auth/*", toNodeHandler(auth));
 
 // Routes
 app.use('/api/users', userRoutes);
@@ -163,7 +111,7 @@ app.use('/api/ai', aiRoutes);
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
-    const { PrismaClient } = await import('@prisma/client');
+    const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
     await prisma.$queryRaw`SELECT 1`;
     await prisma.$disconnect();
