@@ -1,5 +1,5 @@
 import express from 'express';
-import { auth } from '../auth.js';
+import { getAuth } from '../auth-wrapper.js';
 
 export interface BetterAuthRequest extends express.Request {
   user?: {
@@ -33,6 +33,7 @@ export async function requireBetterAuth(
 ) {
   try {
     // Get session from Better Auth
+    const auth = await getAuth();
     const session = await auth.api.getSession({
       headers: req.headers as any
     });
@@ -67,6 +68,7 @@ export async function optionalBetterAuth(
   next: express.NextFunction
 ) {
   try {
+    const auth = await getAuth();
     const session = await auth.api.getSession({
       headers: req.headers as any
     });
@@ -94,6 +96,7 @@ export const authenticateToken = async (
   next: express.NextFunction
 ) => {
   try {
+    const auth = await getAuth();
     const session = await auth.api.getSession({
       headers: req.headers as any,
     });

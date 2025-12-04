@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { auth } from './auth.js';
+import { getAuth } from './auth-wrapper.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -19,6 +19,7 @@ export const initializeSocket = (io: Server) => {
       const cookies = socket.handshake.headers.cookie;
 
       // Try to get session from Better Auth
+      const auth = await getAuth();
       const session = await auth.api.getSession({
         headers: {
           cookie: cookies || '',

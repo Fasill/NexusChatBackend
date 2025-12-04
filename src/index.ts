@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
-import { auth } from './auth.js';
+import { getAuth } from './auth-wrapper.js';
 import { toNodeHandler } from "better-auth/node";
 import userRoutes from './routes/users.js';
 import chatRoutes from './routes/chat.js';
@@ -127,8 +127,12 @@ app.use("/api/auth/*", (req, res, next) => {
   next();
 });
 
-// Setup Better Auth handler
-app.all("/api/auth/*", toNodeHandler(auth));
+// Setup Better Auth handler with dynamic import
+app.all("/api/auth/*", async (req, res) => {
+  const auth = await getAuth();
+  const handler = toNodeHandler(auth);
+  return handler(req, res);
+});
 
 // Routes
 app.use('/api/users', userRoutes);
