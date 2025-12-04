@@ -1,5 +1,5 @@
 import { Server, Socket } from 'socket.io';
-import { auth } from './auth';
+import { auth } from './auth.js';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

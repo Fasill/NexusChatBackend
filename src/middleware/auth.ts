@@ -1,5 +1,5 @@
 import express from 'express';
-import { auth } from '../auth';
+import { auth } from '../auth.js';
 
 export interface BetterAuthRequest extends express.Request {
   user?: {

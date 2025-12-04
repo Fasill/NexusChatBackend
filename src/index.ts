@@ -3,14 +3,14 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
-import { auth } from './auth';
+import { auth } from './auth.js';
 import { toNodeHandler } from "better-auth/node";
-import userRoutes from './routes/users';
-import chatRoutes from './routes/chat';
-import aiRoutes from './routes/ai';
-import { initializeSocket } from './socket';
-import { setSocketInstance } from './socketInstance';
-import { corsMiddleware } from './middleware/cors';
+import userRoutes from './routes/users.js';
+import chatRoutes from './routes/chat.js';
+import aiRoutes from './routes/ai.js';
+import { initializeSocket } from './socket.js';
+import { setSocketInstance } from './socketInstance.js';
+import { corsMiddleware } from './middleware/cors.js';
 
 // Load .env file from backend directory (relative to compiled output)
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -138,7 +138,7 @@ app.use('/api/ai', aiRoutes);
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
-    const { PrismaClient } = require('@prisma/client');
+    const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     await prisma.$queryRaw`SELECT 1`;
     await prisma.$disconnect();

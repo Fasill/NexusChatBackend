@@ -1,6 +1,6 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth.js';
 import { z } from 'zod';
 
 const router = express.Router();
@@ -215,7 +215,7 @@ router.post('/session/:sessionId/read', authenticateToken, async (req: AuthReque
     });
 
     // Emit read receipts via socket
-    const { getSocketInstance } = require('../socketInstance');
+    const { getSocketInstance } = await import('../socketInstance.js');
     const io = getSocketInstance();
     if (io && io.sockets) {
       // Notify sender that messages were read
