@@ -14,8 +14,21 @@ const onlineUsers = new Map<string, string>(); // userId -> socketId
 export const initializeSocket = (io: Server) => {
   console.log("🔌 Initializing Socket.IO handlers...");
   
+  // Log all connection attempts
+  io.engine.on("connection", (socket) => {
+    console.log("🔌 Socket.IO engine connection attempt");
+  });
+  
   io.use(async (socket, next) => {
     console.log("🔐 Socket middleware triggered - handshake received");
+    console.log("🔐 Handshake details:", {
+      url: socket.handshake.url,
+      query: socket.handshake.query,
+      headers: {
+        cookie: socket.handshake.headers.cookie ? 'PRESENT' : 'MISSING',
+        origin: socket.handshake.headers.origin,
+      },
+    });
     try {
       // Better Auth uses cookies, but we can also accept token in handshake for Socket.IO
       const token = socket.handshake.auth.token;
