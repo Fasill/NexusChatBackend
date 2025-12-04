@@ -72,6 +72,27 @@ const io = new Server(httpServer, {
   transports: ["websocket", "polling"],
   pingTimeout: 60000,
   pingInterval: 25000,
+  path: "/socket.io",
+  allowEIO3: true,
+});
+
+// Log socket connection attempts
+io.engine.on("connection_error", (err) => {
+  console.error("❌ Socket.IO engine connection error:", err);
+  console.error("Error details:", {
+    req: err.req?.url,
+    code: err.code,
+    message: err.message,
+    context: err.context,
+  });
+});
+
+io.engine.on("upgrade", (req, socket, head) => {
+  console.log("🔌 Socket.IO upgrade attempt:", {
+    url: req.url,
+    headers: req.headers,
+    origin: req.headers.origin,
+  });
 });
 
 const PORT = process.env.PORT || 3001;

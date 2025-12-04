@@ -12,7 +12,10 @@ interface SocketUser {
 const onlineUsers = new Map<string, string>(); // userId -> socketId
 
 export const initializeSocket = (io: Server) => {
+  console.log("🔌 Initializing Socket.IO handlers...");
+  
   io.use(async (socket, next) => {
+    console.log("🔐 Socket middleware triggered - handshake received");
     try {
       // Better Auth uses cookies, but we can also accept token in handshake for Socket.IO
       const token = socket.handshake.auth.token;
