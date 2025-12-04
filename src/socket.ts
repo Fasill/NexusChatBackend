@@ -14,43 +14,34 @@ const onlineUsers = new Map<string, string>(); // userId -> socketId
 export const initializeSocket = (io: Server) => {
   console.log("🔌 Initializing Socket.IO handlers...");
   
-  // Log all connection attempts
-  io.engine.on("connection", (socket) => {
-    console.log("🔌 Socket.IO engine connection attempt");
-  });
-  
+  // Allow handshake to complete, authenticate after connection
   io.use(async (socket, next) => {
-    console.log("🔐 Socket middleware triggered - handshake received");
-    console.log("🔐 Handshake details:", {
-      url: socket.handshake.url,
-      query: socket.handshake.query,
-      headers: {
-        cookie: socket.handshake.headers.cookie ? 'PRESENT' : 'MISSING',
-        origin: socket.handshake.headers.origin,
-      },
-    });
+    // Skip auth for Socket.IO handshake path - allow connection first
+    if (socket.handshake.url === "/socket.io/" || socket.handshake.url?.includes("/socket.io/")) {
+      console.log("🔌 Allowing Socket.IO handshake");
+      return next();
+    }
+    next();
+  });
+
+  io.on('connection', async (socket: Socket & { userId?: string }) => {
+    console.log(`🔌 Socket connection attempt: ${socket.id}`);
+    
+    // Authenticate after connection
     try {
-      // Better Auth uses cookies, but we can also accept token in handshake for Socket.IO
-      const token = socket.handshake.auth.token;
       const cookies = socket.handshake.headers.cookie;
+      const token = socket.handshake.auth.token;
 
-      console.log('🔐 Socket auth attempt:', {
-        hasCookies: !!cookies,
-        hasToken: !!token,
-        origin: socket.handshake.headers.origin,
-        cookieHeader: cookies ? cookies.substring(0, 100) + '...' : 'none',
-      });
-
-      // If no cookies and no token, reject immediately
       if (!cookies && !token) {
         console.error('❌ Socket auth failed: No cookies or token');
-        return next(new Error('Authentication required'));
+        socket.emit('auth_error', { message: 'Authentication required' });
+        socket.disconnect();
+        return;
       }
 
       // Try to get session from Better Auth
       const auth = await getAuth();
       
-      // Build headers for session check
       const headers: any = {
         origin: socket.handshake.headers.origin || '',
         referer: socket.handshake.headers.referer || '',
@@ -70,29 +61,24 @@ export const initializeSocket = (io: Server) => {
 
       if (!session || !session.user) {
         console.error('❌ Socket auth failed: No session or user');
-        console.error('Session check result:', session);
-        return next(new Error('Authentication error'));
+        socket.emit('auth_error', { message: 'Invalid session' });
+        socket.disconnect();
+        return;
       }
 
       console.log('✅ Socket authenticated for user:', session.user.id);
-      (socket as any).userId = session.user.id;
-      next();
+      socket.userId = session.user.id;
     } catch (error: any) {
       console.error('❌ Socket authentication error:', error);
-      console.error('Error details:', {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name,
-      });
-      return next(new Error('Invalid session'));
+      socket.emit('auth_error', { message: 'Authentication failed' });
+      socket.disconnect();
+      return;
     }
-  });
 
-  io.on('connection', (socket: Socket & { userId?: string }) => {
     const userId = socket.userId!;
     onlineUsers.set(userId, socket.id);
 
-    console.log(`User ${userId} connected`);
+    console.log(`✅ User ${userId} connected`);
 
     // Notify others that this user is online
     socket.broadcast.emit('user-online', { userId });
