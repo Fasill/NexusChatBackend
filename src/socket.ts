@@ -18,23 +18,56 @@ export const initializeSocket = (io: Server) => {
       const token = socket.handshake.auth.token;
       const cookies = socket.handshake.headers.cookie;
 
+      console.log('🔐 Socket auth attempt:', {
+        hasCookies: !!cookies,
+        hasToken: !!token,
+        origin: socket.handshake.headers.origin,
+        cookieHeader: cookies ? cookies.substring(0, 100) + '...' : 'none',
+      });
+
+      // If no cookies and no token, reject immediately
+      if (!cookies && !token) {
+        console.error('❌ Socket auth failed: No cookies or token');
+        return next(new Error('Authentication required'));
+      }
+
       // Try to get session from Better Auth
       const auth = await getAuth();
+      
+      // Build headers for session check
+      const headers: any = {
+        origin: socket.handshake.headers.origin || '',
+        referer: socket.handshake.headers.referer || '',
+      };
+      
+      if (cookies) {
+        headers.cookie = cookies;
+      }
+      
+      if (token) {
+        headers.authorization = `Bearer ${token}`;
+      }
+
       const session = await auth.api.getSession({
-        headers: {
-          cookie: cookies || '',
-          authorization: token ? `Bearer ${token}` : '',
-        } as any,
+        headers,
       });
 
       if (!session || !session.user) {
+        console.error('❌ Socket auth failed: No session or user');
+        console.error('Session check result:', session);
         return next(new Error('Authentication error'));
       }
 
+      console.log('✅ Socket authenticated for user:', session.user.id);
       (socket as any).userId = session.user.id;
       next();
-    } catch (error) {
-      console.error('Socket authentication error:', error);
+    } catch (error: any) {
+      console.error('❌ Socket authentication error:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name,
+      });
       return next(new Error('Invalid session'));
     }
   });
