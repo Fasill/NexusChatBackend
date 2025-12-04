@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 import path from 'path';
-import { auth } from './auth';
+import { auth } from './auth.js';
 import { toNodeHandler } from "better-auth/node";
 import userRoutes from './routes/users.js';
 import chatRoutes from './routes/chat.js';
