@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
@@ -11,6 +10,7 @@ import chatRoutes from './routes/chat';
 import aiRoutes from './routes/ai';
 import { initializeSocket } from './socket';
 import { setSocketInstance } from './socketInstance';
+import { corsMiddleware } from './middleware/cors';
 
 // Load .env file from backend directory (relative to compiled output)
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -31,9 +31,40 @@ if (apiKey) {
 
 const app = express();
 const httpServer = createServer(app);
+// Socket.IO CORS configuration - supports dynamic origins
+const getSocketCorsOrigin = (origin: string | undefined): boolean | string => {
+  if (!origin) return false;
+  
+  // Allow localhost in development
+  if (origin.startsWith('http://localhost:')) {
+    return origin;
+  }
+  
+  // Allow any Vercel deployment URL
+  if (origin.endsWith('.vercel.app')) {
+    return origin;
+  }
+  
+  // Allow specific frontend URL if set
+  if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+    return origin;
+  }
+  
+  // Check allowed origins list
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+    : [];
+  
+  if (allowedOrigins.includes(origin)) {
+    return origin;
+  }
+  
+  return false;
+};
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: getSocketCorsOrigin,
     methods: ["GET", "POST"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]
@@ -49,10 +80,7 @@ const PORT = process.env.PORT || 3001;
 setSocketInstance(io);
 
 // Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:3000",
-  credentials: true
-}));
+app.use(corsMiddleware); // Use custom CORS middleware for production support
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
