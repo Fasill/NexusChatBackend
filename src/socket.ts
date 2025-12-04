@@ -276,4 +276,3 @@ export const initializeSocket = (io: Server) => {
     });
   });
 };
-
