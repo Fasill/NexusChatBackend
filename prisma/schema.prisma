@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String?   // Optional - Better Auth stores passwords in Account table
+  emailVerified Boolean?   @default(false)
+  picture       String?   // URL to profile picture or placeholder
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Better Auth relations
+  sessions  Session[]
+  accounts  Account[]
+
+  // Relations
+  sentMessages     Message[]      @relation("SenderMessages")
+  receivedMessages Message[]      @relation("ReceiverMessages")
+  chatSessions     ChatSession[]  @relation("Participant1")
+  chatSessions2    ChatSession[]  @relation("Participant2")
+
+  @@map("users")
+}
+
+// Better Auth models
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  accountId         String
+  providerId        String
+  accessToken       String?
+  refreshToken      String?
+  idToken           String?
+  expiresAt         DateTime?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@index([value])
+  @@map("verifications")
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  participant1Id String
+  participant2Id String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participant1 User      @relation("Participant1", fields: [participant1Id], references: [id])
+  participant2 User      @relation("Participant2", fields: [participant2Id], references: [id])
+  messages     Message[]
+
+  @@unique([participant1Id, participant2Id])
+  @@map("chat_sessions")
+}
+
+model Message {
+  id            String      @id @default(cuid())
+  content       String
+  senderId      String
+  receiverId    String
+  chatSessionId String
+  createdAt     DateTime    @default(now())
+  readAt        DateTime?   // When the message was read
+
+  sender        User        @relation("SenderMessages", fields: [senderId], references: [id])
+  receiver      User        @relation("ReceiverMessages", fields: [receiverId], references: [id])
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id])
+
+  @@map("messages")
+}
+
