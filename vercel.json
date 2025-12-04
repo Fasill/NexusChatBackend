@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "dist/**",
+          "prisma/**",
+          "package.json"
+        ],
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/dist/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/index.js"
+    }
+  ]
+}
+
